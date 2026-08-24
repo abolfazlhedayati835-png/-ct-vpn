@@ -41,6 +41,9 @@ android {
 }
 
 dependencies {
+    // Real Xray/V2Ray networking core, compiled by the CI workflow (see .github/workflows/build.yml)
+    implementation(files("libs/libv2ray.aar"))
+
     // Core / Compose
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")

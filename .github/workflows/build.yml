@@ -6,7 +6,47 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  build:
+  # Job 1: compiles the real Xray networking core (Go) into an Android AAR.
+  # This step downloads/compiles a large Go project so it naturally takes a while (~15-25 min).
+  build-core:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install Android NDK
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager --install "ndk;26.1.10909125"
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> "$GITHUB_ENV"
+
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Build libv2ray.aar from AndroidLibXrayLite
+        run: |
+          git clone --depth=1 https://github.com/2dust/AndroidLibXrayLite core-src
+          cd core-src
+          gomobile init
+          go mod tidy -v
+          gomobile bind -v -androidapi 21 -ldflags='-s -w' ./
+          mkdir -p "$GITHUB_WORKSPACE/core-out"
+          cp libv2ray.aar "$GITHUB_WORKSPACE/core-out/"
+
+      - name: Upload libv2ray.aar as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libv2ray-aar
+          path: core-out/libv2ray.aar
+
+  # Job 2: builds the actual Android app, using the aar produced above.
+  build-app:
+    needs: build-core
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -17,6 +57,12 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+
+      - name: Download libv2ray.aar
+        uses: actions/download-artifact@v4
+        with:
+          name: libv2ray-aar
+          path: app/libs
 
       - name: Install Gradle
         run: |
@@ -30,5 +76,5 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ninja-config-debug-apk
+          name: ct-vpn-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
