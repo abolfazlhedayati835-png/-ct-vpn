@@ -37,7 +37,7 @@ jobs:
           cd core-src
           gomobile init
           go mod tidy -v
-          gomobile bind -v -androidapi 21 -ldflags='-s -w' ./
+          gomobile bind -v -androidapi 21 -ldflags='-s -w -checklinkname=0' ./
           mkdir -p "$GITHUB_WORKSPACE/core-out"
           cp libv2ray.aar "$GITHUB_WORKSPACE/core-out/"
 
