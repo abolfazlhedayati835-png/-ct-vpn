@@ -1,9 +1,18 @@
 package com.ninjaconfig.app
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import com.ninjaconfig.app.data.ConfigViewModel
 import com.ninjaconfig.app.data.ConfigsUiState
 import com.ninjaconfig.app.data.VpnConfig
@@ -11,14 +20,42 @@ import com.ninjaconfig.app.ui.screens.AdminScreen
 import com.ninjaconfig.app.ui.screens.ConnectScreen
 import com.ninjaconfig.app.ui.screens.ConnectionState
 import com.ninjaconfig.app.ui.theme.NinjaConfigTheme
-import kotlinx.coroutines.delay
+import com.ninjaconfig.app.vpn.CtVpnService
 
 class MainActivity : ComponentActivity() {
+
+    private var onVpnPermissionResult: ((Boolean) -> Unit)? = null
+
+    private val vpnPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        onVpnPermissionResult?.invoke(result.resultCode == RESULT_OK)
+    }
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* no-op, notification is best-effort */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+
         setContent {
             NinjaConfigTheme {
-                AppRoot()
+                AppRoot(
+                    requestVpnPermission = { onResult ->
+                        onVpnPermissionResult = onResult
+                        val prepareIntent = VpnService.prepare(this)
+                        if (prepareIntent != null) {
+                            vpnPermissionLauncher.launch(prepareIntent)
+                        } else {
+                            onResult(true)
+                        }
+                    }
+                )
             }
         }
     }
@@ -27,7 +64,8 @@ class MainActivity : ComponentActivity() {
 private enum class Screen { MAIN, ADMIN }
 
 @Composable
-private fun AppRoot() {
+private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
+    val context = LocalContext.current
     val viewModel = remember { ConfigViewModel() }
     val uiState by viewModel.uiState.collectAsState()
 
@@ -44,11 +82,48 @@ private fun AppRoot() {
         }
     }
 
-    LaunchedEffect(connectionState) {
-        if (connectionState == ConnectionState.CONNECTING) {
-            delay(1200)
-            connectionState = ConnectionState.CONNECTED
+    // Listen for real status updates coming from the VPN service.
+    DisposableEffect(Unit) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                when (intent?.getStringExtra(CtVpnService.EXTRA_STATUS)) {
+                    "connected" -> connectionState = ConnectionState.CONNECTED
+                    "disconnected" -> connectionState = ConnectionState.DISCONNECTED
+                    "error" -> connectionState = ConnectionState.DISCONNECTED
+                }
+            }
         }
+        val filter = IntentFilter(CtVpnService.ACTION_STATUS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            context.registerReceiver(receiver, filter)
+        }
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+
+    fun startVpn(config: VpnConfig) {
+        connectionState = ConnectionState.CONNECTING
+        requestVpnPermission { granted ->
+            if (!granted) {
+                connectionState = ConnectionState.DISCONNECTED
+                return@requestVpnPermission
+            }
+            val intent = Intent(context, CtVpnService::class.java).apply {
+                action = CtVpnService.ACTION_CONNECT
+                putExtra(CtVpnService.EXTRA_CONFIG_LINK, config.configLink)
+            }
+            ContextCompat.startForegroundService(context, intent)
+        }
+    }
+
+    fun stopVpn() {
+        val intent = Intent(context, CtVpnService::class.java).apply {
+            action = CtVpnService.ACTION_DISCONNECT
+        }
+        context.startService(intent)
+        connectionState = ConnectionState.DISCONNECTED
     }
 
     when (screen) {
@@ -67,10 +142,11 @@ private fun AppRoot() {
                 selectedConfig = selectedConfig,
                 connectionState = connectionState,
                 onToggleConnect = {
-                    connectionState = when (connectionState) {
-                        ConnectionState.DISCONNECTED -> ConnectionState.CONNECTING
-                        ConnectionState.CONNECTING -> ConnectionState.DISCONNECTED
-                        ConnectionState.CONNECTED -> ConnectionState.DISCONNECTED
+                    when (connectionState) {
+                        ConnectionState.DISCONNECTED -> {
+                            selectedConfig?.let { startVpn(it) }
+                        }
+                        ConnectionState.CONNECTED, ConnectionState.CONNECTING -> stopVpn()
                     }
                 },
                 onMenuClick = { screen = Screen.ADMIN }
