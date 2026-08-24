@@ -3,10 +3,8 @@ package com.ninjaconfig.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.ninjaconfig.app.data.ConfigViewModel
@@ -51,8 +49,10 @@ private fun AppRoot() {
             )
         }
         Screen.MAIN -> {
-            Column(Modifier.fillMaxSize()) {
-                Box(Modifier.weight(1f)) {
+            Scaffold(
+                bottomBar = { BottomNavBar(current = tab, onSelect = { tab = it }) }
+            ) { innerPadding ->
+                androidx.compose.foundation.layout.Box(Modifier.padding(innerPadding)) {
                     when (tab) {
                         BottomTab.HOME -> {
                             ConnectScreen(
@@ -83,7 +83,6 @@ private fun AppRoot() {
                         BottomTab.SETTINGS -> SettingsScreen(onAdminClick = { screen = Screen.ADMIN })
                     }
                 }
-                BottomNavBar(current = tab, onSelect = { tab = it })
             }
         }
     }
