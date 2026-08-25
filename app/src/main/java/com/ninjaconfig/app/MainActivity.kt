@@ -86,10 +86,16 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
     DisposableEffect(Unit) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context?, intent: Intent?) {
+                val message = intent?.getStringExtra(CtVpnService.EXTRA_MESSAGE)
                 when (intent?.getStringExtra(CtVpnService.EXTRA_STATUS)) {
                     "connected" -> connectionState = ConnectionState.CONNECTED
                     "disconnected" -> connectionState = ConnectionState.DISCONNECTED
-                    "error" -> connectionState = ConnectionState.DISCONNECTED
+                    "error" -> {
+                        connectionState = ConnectionState.DISCONNECTED
+                        if (!message.isNullOrBlank()) {
+                            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }
                 }
             }
         }

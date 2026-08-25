@@ -91,7 +91,7 @@ class CtVpnService : VpnService(), CoreCallbackHandler {
             coreController = Libv2ray.newCoreController(this)
             coreController?.startLoop(jsonConfig, fd)
         } catch (e: Exception) {
-            broadcastStatus("error", e.message ?: "خطای نامشخص در اتصال")
+            broadcastStatus("error", "${e.javaClass.simpleName}: ${e.message ?: "خطای نامشخص"}")
             stopVpn()
         }
     }
@@ -130,6 +130,9 @@ class CtVpnService : VpnService(), CoreCallbackHandler {
     }
 
     override fun onEmitStatus(code: Long, message: String?): Long {
+        if (code != 0L && !message.isNullOrBlank()) {
+            broadcastStatus("error", message)
+        }
         return 0
     }
 
