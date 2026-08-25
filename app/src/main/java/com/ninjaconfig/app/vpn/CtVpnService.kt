@@ -43,18 +43,30 @@ class CtVpnService : VpnService(), CoreCallbackHandler {
             ACTION_CONNECT -> {
                 val link = intent.getStringExtra(EXTRA_CONFIG_LINK)
                 if (link.isNullOrBlank()) {
+                    startForeground(NOTIFICATION_ID, buildNotification())
                     broadcastStatus("error", "کانفیگی برای اتصال پیدا نشد")
-                    stopSelf()
+                    stopVpn()
                 } else {
                     startVpn(link)
                 }
             }
             ACTION_DISCONNECT -> stopVpn()
+            else -> {
+                // Android requires startForeground() to be called unconditionally
+                // shortly after startForegroundService(), even for an unknown/empty action.
+                startForeground(NOTIFICATION_ID, buildNotification())
+                stopVpn()
+            }
         }
         return START_NOT_STICKY
     }
 
     private fun startVpn(configLink: String) {
+        // Must be the very first thing that happens: the OS kills the service
+        // if startForeground() isn't called within a few seconds of
+        // startForegroundService(), regardless of what we do afterwards.
+        startForeground(NOTIFICATION_ID, buildNotification())
+
         try {
             val jsonConfig = XrayConfigBuilder.build(configLink)
 
@@ -72,11 +84,9 @@ class CtVpnService : VpnService(), CoreCallbackHandler {
             tunInterface = builder.establish()
             val fd = tunInterface?.fd ?: run {
                 broadcastStatus("error", "برقراری تانل شکست خورد")
-                stopSelf()
+                stopVpn()
                 return
             }
-
-            startForeground(NOTIFICATION_ID, buildNotification())
 
             coreController = Libv2ray.newCoreController(this)
             coreController?.startLoop(jsonConfig, fd)
