@@ -76,7 +76,7 @@ object XrayConfigBuilder {
     }
 
     private fun parseVless(link: String): JSONObject {
-        val uri = URI(link)
+        val uri = URI(link.substringBefore("#"))
         val id = uri.userInfo
         val address = uri.host
         val port = if (uri.port > 0) uri.port else 443
@@ -119,7 +119,7 @@ object XrayConfigBuilder {
     }
 
     private fun parseTrojan(link: String): JSONObject {
-        val uri = URI(link)
+        val uri = URI(link.substringBefore("#"))
         val password = uri.userInfo
         val address = uri.host
         val port = if (uri.port > 0) uri.port else 443
