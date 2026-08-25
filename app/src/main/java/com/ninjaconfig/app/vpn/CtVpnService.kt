@@ -81,6 +81,8 @@ class CtVpnService : VpnService(), CoreCallbackHandler {
                 .addDnsServer("8.8.8.8")
                 .setMtu(1500)
 
+            runCatching { builder.addDisallowedApplication(packageName) }
+
             tunInterface = builder.establish()
             val fd = tunInterface?.fd ?: run {
                 broadcastStatus("error", "برقراری تانل شکست خورد")
