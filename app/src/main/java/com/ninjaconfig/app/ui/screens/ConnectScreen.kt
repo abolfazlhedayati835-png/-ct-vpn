@@ -130,7 +130,7 @@ private fun ConnectRing(state: ConnectionState, elapsedSeconds: Int, onClick: ()
             )
 
             if (isConnected) {
-                val sweep = 300f
+                val sweep = 360f
                 val startAngle = -90f
                 drawArc(
                     brush = Brush.sweepGradient(

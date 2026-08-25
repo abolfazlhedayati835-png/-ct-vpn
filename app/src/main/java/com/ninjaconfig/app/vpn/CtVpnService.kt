@@ -123,6 +123,15 @@ class CtVpnService : VpnService(), CoreCallbackHandler {
 
     override fun startup(): Long {
         broadcastStatus("connected", "متصل شد")
+        Thread {
+            val delayMs = runCatching { coreController?.measureDelay("https://www.gstatic.com/generate_204") }
+                .getOrNull()
+            if (delayMs != null && delayMs >= 0) {
+                broadcastStatus("diagnostic", "تست اتصال هسته موفق: ${delayMs}ms")
+            } else {
+                broadcastStatus("diagnostic", "تست اتصال هسته شکست خورد (هسته نمی‌تونه به اینترنت وصل بشه)")
+            }
+        }.start()
         return 0
     }
 

@@ -96,6 +96,11 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
                             android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
                         }
                     }
+                    "diagnostic" -> {
+                        if (!message.isNullOrBlank()) {
+                            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    }
                 }
             }
         }
