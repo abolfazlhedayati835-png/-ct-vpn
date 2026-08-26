@@ -16,7 +16,6 @@ import androidx.core.content.ContextCompat
 import com.ninjaconfig.app.data.ConfigViewModel
 import com.ninjaconfig.app.data.ConfigsUiState
 import com.ninjaconfig.app.data.VpnConfig
-import com.ninjaconfig.app.ui.screens.AdminScreen
 import com.ninjaconfig.app.ui.screens.ConnectScreen
 import com.ninjaconfig.app.ui.screens.ConnectionState
 import com.ninjaconfig.app.ui.theme.NinjaConfigTheme
@@ -61,8 +60,6 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { MAIN, ADMIN }
-
 @Composable
 private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
     val context = LocalContext.current
@@ -72,6 +69,8 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
     var screen by remember { mutableStateOf(Screen.MAIN) }
     var selectedConfig by remember { mutableStateOf<VpnConfig?>(null) }
     var connectionState by remember { mutableStateOf(ConnectionState.DISCONNECTED) }
+    var downloadMbps by remember { mutableStateOf(0.0) }
+    var uploadMbps by remember { mutableStateOf(0.0) }
 
     // Auto-pick a config for the user once the list loads - no manual server picker.
     LaunchedEffect(uiState) {
@@ -114,6 +113,24 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
         onDispose { context.unregisterReceiver(receiver) }
     }
 
+    // Listen for real upload/download speed updates from the VPN service.
+    DisposableEffect(Unit) {
+        val trafficReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                downloadMbps = intent?.getDoubleExtra(CtVpnService.EXTRA_DOWNLOAD_MBPS, 0.0) ?: 0.0
+                uploadMbps = intent?.getDoubleExtra(CtVpnService.EXTRA_UPLOAD_MBPS, 0.0) ?: 0.0
+            }
+        }
+        val trafficFilter = IntentFilter(CtVpnService.ACTION_TRAFFIC)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(trafficReceiver, trafficFilter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("UnspecifiedRegisterReceiverFlag")
+            context.registerReceiver(trafficReceiver, trafficFilter)
+        }
+        onDispose { context.unregisterReceiver(trafficReceiver) }
+    }
+
     fun startVpn(config: VpnConfig) {
         connectionState = ConnectionState.CONNECTING
         requestVpnPermission { granted ->
@@ -137,31 +154,19 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
         connectionState = ConnectionState.DISCONNECTED
     }
 
-    when (screen) {
-        Screen.ADMIN -> {
-            val currentConfigs = (uiState as? ConfigsUiState.Loaded)?.groups?.flatMap { it.configs } ?: emptyList()
-            AdminScreen(
-                configs = currentConfigs,
-                onBack = { screen = Screen.MAIN },
-                onAdd = { viewModel.addConfig(it) },
-                onUpdate = { viewModel.updateConfig(it) },
-                onDelete = { viewModel.deleteConfig(it) }
-            )
-        }
-        Screen.MAIN -> {
-            ConnectScreen(
-                selectedConfig = selectedConfig,
-                connectionState = connectionState,
-                onToggleConnect = {
-                    when (connectionState) {
-                        ConnectionState.DISCONNECTED -> {
-                            selectedConfig?.let { startVpn(it) }
-                        }
-                        ConnectionState.CONNECTED, ConnectionState.CONNECTING -> stopVpn()
-                    }
-                },
-                onMenuClick = { screen = Screen.ADMIN }
-            )
-        }
-    }
+    ConnectScreen(
+        selectedConfig = selectedConfig,
+        connectionState = connectionState,
+        downloadMbps = downloadMbps,
+        uploadMbps = uploadMbps,
+        onToggleConnect = {
+            when (connectionState) {
+                ConnectionState.DISCONNECTED -> {
+                    selectedConfig?.let { startVpn(it) }
+                }
+                ConnectionState.CONNECTED, ConnectionState.CONNECTING -> stopVpn()
+            }
+        },
+        onMenuClick = { /* admin panel now lives in a separate app for security */ }
+    )
 }

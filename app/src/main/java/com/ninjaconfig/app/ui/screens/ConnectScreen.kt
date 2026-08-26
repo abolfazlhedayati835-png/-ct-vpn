@@ -39,6 +39,8 @@ enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED }
 fun ConnectScreen(
     selectedConfig: VpnConfig?,
     connectionState: ConnectionState,
+    downloadMbps: Double = 0.0,
+    uploadMbps: Double = 0.0,
     onToggleConnect: () -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -69,7 +71,7 @@ fun ConnectScreen(
         Spacer(Modifier.height(14.dp))
         ServerInfoRow(config = selectedConfig)
         Spacer(Modifier.height(14.dp))
-        SpeedCards()
+        SpeedCards(downloadMbps = downloadMbps, uploadMbps = uploadMbps)
         Spacer(Modifier.height(20.dp))
     }
 }
@@ -208,6 +210,11 @@ private fun ConnectRing(state: ConnectionState, elapsedSeconds: Int, onClick: ()
     }
 }
 
+private fun formatMbps(value: Double): String {
+    if (value <= 0.0) return "—"
+    return "%.1f".format(value)
+}
+
 private fun formatElapsed(totalSeconds: Int): String {
     val h = totalSeconds / 3600
     val m = (totalSeconds % 3600) / 60
@@ -271,10 +278,10 @@ private fun ServerInfoRow(config: VpnConfig?) {
 }
 
 @Composable
-private fun SpeedCards() {
+private fun SpeedCards(downloadMbps: Double, uploadMbps: Double) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        SpeedCard(label = "دانلود", value = "—", icon = Icons.Filled.ArrowDownward, modifier = Modifier.weight(1f))
-        SpeedCard(label = "آپلود", value = "—", icon = Icons.Filled.ArrowUpward, modifier = Modifier.weight(1f))
+        SpeedCard(label = "دانلود", value = formatMbps(downloadMbps), icon = Icons.Filled.ArrowDownward, modifier = Modifier.weight(1f))
+        SpeedCard(label = "آپلود", value = formatMbps(uploadMbps), icon = Icons.Filled.ArrowUpward, modifier = Modifier.weight(1f))
     }
 }
 

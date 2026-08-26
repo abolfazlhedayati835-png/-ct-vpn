@@ -39,6 +39,13 @@ object XrayConfigBuilder {
             )
         }
         root.put("inbounds", JSONArray().put(tunInbound))
+        root.put("stats", JSONObject())
+        root.put(
+            "policy",
+            JSONObject()
+                .put("levels", JSONObject().put("8", JSONObject().put("statsUserUplink", true).put("statsUserDownlink", true)))
+                .put("system", JSONObject().put("statsOutboundUplink", true).put("statsOutboundDownlink", true))
+        )
 
         val outbounds = JSONArray()
         outbounds.put(outbound)
