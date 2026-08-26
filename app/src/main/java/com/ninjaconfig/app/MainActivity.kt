@@ -66,7 +66,6 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
     val viewModel = remember { ConfigViewModel() }
     val uiState by viewModel.uiState.collectAsState()
 
-    var screen by remember { mutableStateOf(Screen.MAIN) }
     var selectedConfig by remember { mutableStateOf<VpnConfig?>(null) }
     var connectionState by remember { mutableStateOf(ConnectionState.DISCONNECTED) }
     var downloadMbps by remember { mutableStateOf(0.0) }
