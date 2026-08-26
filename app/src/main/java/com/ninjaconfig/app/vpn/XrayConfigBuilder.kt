@@ -26,7 +26,19 @@ object XrayConfigBuilder {
 
         val root = JSONObject()
         root.put("log", JSONObject().put("loglevel", "warning"))
-        root.put("inbounds", JSONArray())
+
+        val tunInbound = JSONObject().apply {
+            put("tag", "tun-in")
+            put("port", 0)
+            put("protocol", "tun")
+            put(
+                "settings",
+                JSONObject()
+                    .put("name", "xray0")
+                    .put("mtu", 1500)
+            )
+        }
+        root.put("inbounds", JSONArray().put(tunInbound))
 
         val outbounds = JSONArray()
         outbounds.put(outbound)
