@@ -267,7 +267,17 @@ private fun ServerInfoRow(config: VpnConfig?) {
             modifier = Modifier.size(38.dp).clip(CircleShape).background(CardDarker),
             contentAlignment = Alignment.Center
         ) {
-            Text(config?.countryCode?.let { countryCodeToFlagEmoji(it) } ?: "🌐", fontSize = 18.sp)
+            val code = config?.countryCode?.trim()
+            if (!code.isNullOrBlank() && code.length == 2) {
+                coil.compose.AsyncImage(
+                    model = "https://flagcdn.com/w160/${code.lowercase()}.png",
+                    contentDescription = config?.countryName,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
+            } else {
+                Text("🌐", fontSize = 18.sp)
+            }
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {

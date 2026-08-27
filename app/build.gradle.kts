@@ -67,6 +67,7 @@ dependencies {
 
     // QR code generation (for showing config as QR, e.g. for v2rayNG import)
     implementation("com.google.zxing:core:3.5.3")
+    implementation("io.coil-kt:coil-compose:2.6.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
