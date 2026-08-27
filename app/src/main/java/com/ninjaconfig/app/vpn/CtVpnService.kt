@@ -31,44 +31,12 @@ class CtVpnService : VpnService(), CoreCallbackHandler {
         const val EXTRA_STATUS = "status" // "connected" | "disconnected" | "error" | "diagnostic"
         const val EXTRA_MESSAGE = "message"
 
-        const val ACTION_TRAFFIC = "com.ninjaconfig.app.VPN_TRAFFIC"
-        const val EXTRA_DOWNLOAD_MBPS = "download_mbps"
-        const val EXTRA_UPLOAD_MBPS = "upload_mbps"
-
         private const val NOTIFICATION_CHANNEL_ID = "ct_vpn_channel"
         private const val NOTIFICATION_ID = 1
     }
 
     private var tunInterface: ParcelFileDescriptor? = null
     private var coreController: CoreController? = null
-    private val statsHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private var lastUplinkBytes = 0L
-    private var lastDownlinkBytes = 0L
-    private val statsPoller = object : Runnable {
-        override fun run() {
-            val controller = coreController
-            if (controller != null) {
-                val uplink = runCatching { controller.queryStats("proxy", "uplink") }.getOrDefault(0L)
-                val downlink = runCatching { controller.queryStats("proxy", "downlink") }.getOrDefault(0L)
-                val upDeltaBytes = (uplink - lastUplinkBytes).coerceAtLeast(0L)
-                val downDeltaBytes = (downlink - lastDownlinkBytes).coerceAtLeast(0L)
-                lastUplinkBytes = uplink
-                lastDownlinkBytes = downlink
-
-                // bytes over 1s -> megabits per second
-                val upMbps = (upDeltaBytes * 8) / 1_000_000.0
-                val downMbps = (downDeltaBytes * 8) / 1_000_000.0
-
-                val intent = Intent(ACTION_TRAFFIC).apply {
-                    putExtra(EXTRA_DOWNLOAD_MBPS, downMbps)
-                    putExtra(EXTRA_UPLOAD_MBPS, upMbps)
-                    setPackage(packageName)
-                }
-                sendBroadcast(intent)
-            }
-            statsHandler.postDelayed(this, 1000)
-        }
-    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -124,11 +92,6 @@ class CtVpnService : VpnService(), CoreCallbackHandler {
 
             coreController = Libv2ray.newCoreController(this)
             coreController?.startLoop(jsonConfig, fd)
-
-            lastUplinkBytes = 0L
-            lastDownlinkBytes = 0L
-            statsHandler.removeCallbacks(statsPoller)
-            statsHandler.postDelayed(statsPoller, 1000)
         } catch (e: Exception) {
             broadcastStatus("error", "${e.javaClass.simpleName}: ${e.message ?: "خطای نامشخص"}")
             stopVpn()
@@ -136,7 +99,6 @@ class CtVpnService : VpnService(), CoreCallbackHandler {
     }
 
     private fun stopVpn() {
-        statsHandler.removeCallbacks(statsPoller)
         runCatching { coreController?.stopLoop() }
         coreController = null
         runCatching { tunInterface?.close() }
@@ -147,7 +109,6 @@ class CtVpnService : VpnService(), CoreCallbackHandler {
     }
 
     override fun onDestroy() {
-        statsHandler.removeCallbacks(statsPoller)
         runCatching { coreController?.stopLoop() }
         runCatching { tunInterface?.close() }
         super.onDestroy()
@@ -162,15 +123,6 @@ class CtVpnService : VpnService(), CoreCallbackHandler {
 
     override fun startup(): Long {
         broadcastStatus("connected", "متصل شد")
-        Thread {
-            val delayMs = runCatching { coreController?.measureDelay("https://www.gstatic.com/generate_204") }
-                .getOrNull()
-            if (delayMs != null && delayMs >= 0) {
-                broadcastStatus("diagnostic", "تست اتصال هسته موفق: ${delayMs}ms")
-            } else {
-                broadcastStatus("diagnostic", "تست اتصال هسته شکست خورد (هسته نمی‌تونه به اینترنت وصل بشه)")
-            }
-        }.start()
         return 0
     }
 

@@ -68,8 +68,6 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
 
     var selectedConfig by remember { mutableStateOf<VpnConfig?>(null) }
     var connectionState by remember { mutableStateOf(ConnectionState.DISCONNECTED) }
-    var downloadMbps by remember { mutableStateOf(0.0) }
-    var uploadMbps by remember { mutableStateOf(0.0) }
 
     // Auto-pick a config for the user once the list loads - no manual server picker.
     LaunchedEffect(uiState) {
@@ -112,24 +110,6 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
         onDispose { context.unregisterReceiver(receiver) }
     }
 
-    // Listen for real upload/download speed updates from the VPN service.
-    DisposableEffect(Unit) {
-        val trafficReceiver = object : BroadcastReceiver() {
-            override fun onReceive(ctx: Context?, intent: Intent?) {
-                downloadMbps = intent?.getDoubleExtra(CtVpnService.EXTRA_DOWNLOAD_MBPS, 0.0) ?: 0.0
-                uploadMbps = intent?.getDoubleExtra(CtVpnService.EXTRA_UPLOAD_MBPS, 0.0) ?: 0.0
-            }
-        }
-        val trafficFilter = IntentFilter(CtVpnService.ACTION_TRAFFIC)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(trafficReceiver, trafficFilter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            context.registerReceiver(trafficReceiver, trafficFilter)
-        }
-        onDispose { context.unregisterReceiver(trafficReceiver) }
-    }
-
     fun startVpn(config: VpnConfig) {
         connectionState = ConnectionState.CONNECTING
         requestVpnPermission { granted ->
@@ -156,8 +136,6 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
     ConnectScreen(
         selectedConfig = selectedConfig,
         connectionState = connectionState,
-        downloadMbps = downloadMbps,
-        uploadMbps = uploadMbps,
         onToggleConnect = {
             when (connectionState) {
                 ConnectionState.DISCONNECTED -> {

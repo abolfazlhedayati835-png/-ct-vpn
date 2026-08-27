@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Menu
@@ -39,8 +37,6 @@ enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED }
 fun ConnectScreen(
     selectedConfig: VpnConfig?,
     connectionState: ConnectionState,
-    downloadMbps: Double = 0.0,
-    uploadMbps: Double = 0.0,
     onToggleConnect: () -> Unit,
     onMenuClick: () -> Unit
 ) {
@@ -70,8 +66,6 @@ fun ConnectScreen(
         SecureBanner(state = connectionState)
         Spacer(Modifier.height(14.dp))
         ServerInfoRow(config = selectedConfig)
-        Spacer(Modifier.height(14.dp))
-        SpeedCards(downloadMbps = downloadMbps, uploadMbps = uploadMbps)
         Spacer(Modifier.height(20.dp))
     }
 }
@@ -210,11 +204,6 @@ private fun ConnectRing(state: ConnectionState, elapsedSeconds: Int, onClick: ()
     }
 }
 
-private fun formatMbps(value: Double): String {
-    if (value <= 0.0) return "—"
-    return "%.1f".format(value)
-}
-
 private fun formatElapsed(totalSeconds: Int): String {
     val h = totalSeconds / 3600
     val m = (totalSeconds % 3600) / 60
@@ -277,36 +266,3 @@ private fun ServerInfoRow(config: VpnConfig?) {
     }
 }
 
-@Composable
-private fun SpeedCards(downloadMbps: Double, uploadMbps: Double) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        SpeedCard(label = "دانلود", value = formatMbps(downloadMbps), icon = Icons.Filled.ArrowDownward, modifier = Modifier.weight(1f))
-        SpeedCard(label = "آپلود", value = formatMbps(uploadMbps), icon = Icons.Filled.ArrowUpward, modifier = Modifier.weight(1f))
-    }
-}
-
-@Composable
-private fun SpeedCard(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(CardDark)
-            .padding(16.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Text(label, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Box(
-                modifier = Modifier.size(26.dp).clip(CircleShape).background(NeonGreenDim),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(icon, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(14.dp))
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(value, color = AccentWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.width(4.dp))
-            Text("Mbps", color = TextSecondary, fontSize = 12.sp)
-        }
-    }
-}
