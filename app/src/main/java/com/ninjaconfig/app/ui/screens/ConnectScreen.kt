@@ -3,6 +3,7 @@ package com.ninjaconfig.app.ui.screens
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -72,8 +73,11 @@ fun ConnectScreen(
 
 @Composable
 private fun TopBar(onMenuClick: () -> Unit) {
+    var tapCount by remember { mutableStateOf(0) }
+    var lastTapTime by remember { mutableStateOf(0L) }
+
     Box(modifier = Modifier.fillMaxWidth()) {
-        IconButton(onClick = onMenuClick, modifier = Modifier.align(Alignment.CenterStart)) {
+        IconButton(onClick = { /* decorative - no menu destination */ }, modifier = Modifier.align(Alignment.CenterStart)) {
             Icon(Icons.Filled.Menu, contentDescription = "Menu", tint = AccentWhite)
         }
         Text(
@@ -81,7 +85,17 @@ private fun TopBar(onMenuClick: () -> Unit) {
             color = AccentWhite,
             fontSize = 24.sp,
             fontWeight = FontWeight.ExtraBold,
-            modifier = Modifier.align(Alignment.Center)
+            modifier = Modifier
+                .align(Alignment.Center)
+                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
+                    val now = System.currentTimeMillis()
+                    tapCount = if (now - lastTapTime > 1200) 1 else tapCount + 1
+                    lastTapTime = now
+                    if (tapCount >= 5) {
+                        tapCount = 0
+                        onMenuClick()
+                    }
+                }
         )
     }
 }

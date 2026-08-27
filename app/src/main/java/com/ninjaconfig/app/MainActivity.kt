@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import com.ninjaconfig.app.data.ConfigViewModel
 import com.ninjaconfig.app.data.ConfigsUiState
 import com.ninjaconfig.app.data.VpnConfig
+import com.ninjaconfig.app.ui.screens.AdminScreen
 import com.ninjaconfig.app.ui.screens.ConnectScreen
 import com.ninjaconfig.app.ui.screens.ConnectionState
 import com.ninjaconfig.app.ui.theme.NinjaConfigTheme
@@ -60,12 +61,15 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private enum class Screen { MAIN, ADMIN }
+
 @Composable
 private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
     val context = LocalContext.current
     val viewModel = remember { ConfigViewModel() }
     val uiState by viewModel.uiState.collectAsState()
 
+    var screen by remember { mutableStateOf(Screen.MAIN) }
     var selectedConfig by remember { mutableStateOf<VpnConfig?>(null) }
     var connectionState by remember { mutableStateOf(ConnectionState.DISCONNECTED) }
 
@@ -133,17 +137,31 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
         connectionState = ConnectionState.DISCONNECTED
     }
 
-    ConnectScreen(
-        selectedConfig = selectedConfig,
-        connectionState = connectionState,
-        onToggleConnect = {
-            when (connectionState) {
-                ConnectionState.DISCONNECTED -> {
-                    selectedConfig?.let { startVpn(it) }
-                }
-                ConnectionState.CONNECTED, ConnectionState.CONNECTING -> stopVpn()
-            }
-        },
-        onMenuClick = { /* admin panel now lives in a separate app for security */ }
-    )
+    when (screen) {
+        Screen.ADMIN -> {
+            val currentConfigs = (uiState as? ConfigsUiState.Loaded)?.groups?.flatMap { it.configs } ?: emptyList()
+            AdminScreen(
+                configs = currentConfigs,
+                onBack = { screen = Screen.MAIN },
+                onAdd = { viewModel.addConfig(it) },
+                onUpdate = { viewModel.updateConfig(it) },
+                onDelete = { viewModel.deleteConfig(it) }
+            )
+        }
+        Screen.MAIN -> {
+            ConnectScreen(
+                selectedConfig = selectedConfig,
+                connectionState = connectionState,
+                onToggleConnect = {
+                    when (connectionState) {
+                        ConnectionState.DISCONNECTED -> {
+                            selectedConfig?.let { startVpn(it) }
+                        }
+                        ConnectionState.CONNECTED, ConnectionState.CONNECTING -> stopVpn()
+                    }
+                },
+                onMenuClick = { screen = Screen.ADMIN }
+            )
+        }
+    }
 }
