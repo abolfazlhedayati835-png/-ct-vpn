@@ -10,9 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.SignalCellularAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -78,9 +76,6 @@ private fun TopBar(onMenuClick: () -> Unit) {
     var lastTapTime by remember { mutableStateOf(0L) }
 
     Box(modifier = Modifier.fillMaxWidth()) {
-        IconButton(onClick = { /* decorative - no menu destination */ }, modifier = Modifier.align(Alignment.CenterStart)) {
-            Icon(Icons.Filled.Menu, contentDescription = "Menu", tint = AccentWhite)
-        }
         Text(
             "CT VPN",
             color = AccentWhite,
@@ -107,14 +102,14 @@ private fun ConnectRing(state: ConnectionState, elapsedSeconds: Int, onClick: ()
     val ringColor = NeonGreen
 
     val infinite = rememberInfiniteTransition(label = "ring")
-    val glowAlpha by infinite.animateFloat(
-        initialValue = 0.55f,
-        targetValue = 1f,
+    val rotation by infinite.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1400, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
+            animation = tween(2500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
         ),
-        label = "glow"
+        label = "rotation"
     )
 
     Box(
@@ -141,22 +136,21 @@ private fun ConnectRing(state: ConnectionState, elapsedSeconds: Int, onClick: ()
             )
 
             if (isConnected) {
-                val sweep = 360f
-                val startAngle = -90f
+                val sweep = 270f
+                val startAngle = rotation - 90f
                 drawArc(
                     brush = Brush.sweepGradient(
-                        listOf(ringColor.copy(alpha = 0.25f), ringColor, ringColor.copy(alpha = 0.25f))
+                        listOf(ringColor.copy(alpha = 0.15f), ringColor, ringColor)
                     ),
                     startAngle = startAngle,
                     sweepAngle = sweep,
                     useCenter = false,
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
                     topLeft = Offset(center.x - radius, center.y - radius),
-                    size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
-                    alpha = glowAlpha
+                    size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
                 )
 
-                // Glowing dots at both ends of the arc, matching the reference design
+                // Glowing dots at both ends of the spinning arc, matching the reference design
                 listOf(startAngle, startAngle + sweep).forEach { angleDeg ->
                     val rad = Math.toRadians(angleDeg.toDouble())
                     val dotX = center.x + radius * cos(rad).toFloat()
@@ -164,8 +158,7 @@ private fun ConnectRing(state: ConnectionState, elapsedSeconds: Int, onClick: ()
                     drawCircle(
                         color = ringColor,
                         radius = strokeWidth * 0.9f,
-                        center = Offset(dotX, dotY),
-                        alpha = glowAlpha
+                        center = Offset(dotX, dotY)
                     )
                 }
             }
@@ -288,7 +281,7 @@ private fun ServerInfoRow(config: VpnConfig?, onClick: () -> Unit) {
                 Text(config.label, color = TextSecondary, fontSize = 12.sp)
             }
         }
-        Icon(Icons.Filled.SignalCellularAlt, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(16.dp))
+        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = TextSecondary)
     }
 }
 

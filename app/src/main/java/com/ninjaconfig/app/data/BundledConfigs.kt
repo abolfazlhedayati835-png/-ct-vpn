@@ -39,7 +39,7 @@ object BundledConfigs {
             countryName = e.name,
             protocol = "vless",
             configLink = e.link,
-            label = "ZEUS",
+            label = "",
             isPremium = false,
             supportsHD = false,
             supportsGaming = false,
