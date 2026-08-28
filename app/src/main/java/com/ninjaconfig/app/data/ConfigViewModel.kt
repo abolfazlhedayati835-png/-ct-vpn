@@ -3,6 +3,8 @@ package com.ninjaconfig.app.data
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
@@ -30,12 +32,10 @@ class ConfigViewModel(
     // becomes reachable (see GithubConfigFetcher.kt for details).
     private var firestoreConfigs: List<VpnConfig> = emptyList()
     private var githubConfigs: List<VpnConfig> = emptyList()
+    private var githubRetryJob: Job? = null
 
     init {
-        viewModelScope.launch {
-            githubConfigs = withContext(Dispatchers.IO) { GithubConfigFetcher.fetchConfigs() }
-            publish()
-        }
+        fetchGithubWithRetry()
 
         repository.observeConfigs()
             .onEach { configs ->
@@ -52,6 +52,41 @@ class ConfigViewModel(
                 }
             }
             .launchIn(viewModelScope)
+    }
+
+    /**
+     * Fetches the GitHub fallback list, retrying automatically with backoff if it
+     * fails or comes back empty (e.g. no internet yet right after a ShareIt/offline
+     * transfer, or the host being briefly unreachable). Stops once it gets a
+     * non-empty result. Safe to call again any time (e.g. from onResume) - it
+     * cancels any retry loop already in flight first.
+     */
+    fun fetchGithubWithRetry() {
+        githubRetryJob?.cancel()
+        githubRetryJob = viewModelScope.launch {
+            val delaysMs = listOf(1000L, 2000L, 4000L, 8000L, 15000L, 30000L)
+            var attempt = 0
+            while (true) {
+                val result = withContext(Dispatchers.IO) { GithubConfigFetcher.fetchConfigs() }
+                if (result.isNotEmpty()) {
+                    githubConfigs = result
+                    publish()
+                    return@launch
+                }
+                if (attempt >= delaysMs.size) {
+                    // Give up automatic retries after ~1 minute of trying; the user
+                    // (or a future manual refresh call) can trigger fetchGithubWithRetry() again.
+                    return@launch
+                }
+                delay(delaysMs[attempt])
+                attempt++
+            }
+        }
+    }
+
+    /** Call when the app returns to the foreground to pick up connectivity that wasn't there at launch. */
+    fun refresh() {
+        fetchGithubWithRetry()
     }
 
     private fun publish() {

@@ -39,7 +39,8 @@ fun ConnectScreen(
     selectedConfig: VpnConfig?,
     connectionState: ConnectionState,
     onToggleConnect: () -> Unit,
-    onMenuClick: () -> Unit
+    onMenuClick: () -> Unit,
+    onServerClick: () -> Unit
 ) {
     var elapsedSeconds by remember { mutableStateOf(0) }
 
@@ -66,7 +67,7 @@ fun ConnectScreen(
         Spacer(Modifier.height(30.dp))
         SecureBanner(state = connectionState)
         Spacer(Modifier.height(14.dp))
-        ServerInfoRow(config = selectedConfig)
+        ServerInfoRow(config = selectedConfig, onClick = onServerClick)
         Spacer(Modifier.height(20.dp))
     }
 }
@@ -254,12 +255,13 @@ private fun SecureBanner(state: ConnectionState) {
 }
 
 @Composable
-private fun ServerInfoRow(config: VpnConfig?) {
+private fun ServerInfoRow(config: VpnConfig?, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(CardDark)
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -12,13 +12,17 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.ninjaconfig.app.data.ConfigViewModel
 import com.ninjaconfig.app.data.ConfigsUiState
 import com.ninjaconfig.app.data.VpnConfig
 import com.ninjaconfig.app.ui.screens.AdminScreen
 import com.ninjaconfig.app.ui.screens.ConnectScreen
 import com.ninjaconfig.app.ui.screens.ConnectionState
+import com.ninjaconfig.app.ui.screens.HomeScreen
 import com.ninjaconfig.app.ui.theme.NinjaConfigTheme
 import com.ninjaconfig.app.vpn.CtVpnService
 
@@ -61,7 +65,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { MAIN, ADMIN }
+private enum class Screen { MAIN, SERVERS, ADMIN }
 
 @Composable
 private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
@@ -71,15 +75,31 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
 
     var screen by remember { mutableStateOf(Screen.MAIN) }
     var selectedConfig by remember { mutableStateOf<VpnConfig?>(null) }
+    var userPickedConfig by remember { mutableStateOf(false) }
     var connectionState by remember { mutableStateOf(ConnectionState.DISCONNECTED) }
 
-    // Auto-pick a config for the user once the list loads - no manual server picker.
+    // Auto-pick a config once the list loads, but only until the user manually
+    // chooses one from the server list - after that we respect their choice.
     LaunchedEffect(uiState) {
         val loaded = uiState as? ConfigsUiState.Loaded
-        if (selectedConfig == null) {
+        if (selectedConfig == null && !userPickedConfig) {
             val allConfigs = loaded?.groups?.flatMap { it.configs } ?: emptyList()
             selectedConfig = allConfigs.randomOrNull()
         }
+    }
+
+    // Re-fetch the GitHub fallback list whenever the app comes back to the
+    // foreground, so returning from ShareIt/offline transfers with no internet
+    // yet at launch self-heals once connectivity is actually available.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // Listen for real status updates coming from the VPN service.
@@ -148,6 +168,17 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
                 onDelete = { viewModel.deleteConfig(it) }
             )
         }
+        Screen.SERVERS -> {
+            HomeScreen(
+                uiState = uiState,
+                onConfigClick = { config ->
+                    selectedConfig = config
+                    userPickedConfig = true
+                    screen = Screen.MAIN
+                },
+                onAdminClick = { screen = Screen.ADMIN }
+            )
+        }
         Screen.MAIN -> {
             ConnectScreen(
                 selectedConfig = selectedConfig,
@@ -160,7 +191,8 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
                         ConnectionState.CONNECTED, ConnectionState.CONNECTING -> stopVpn()
                     }
                 },
-                onMenuClick = { screen = Screen.ADMIN }
+                onMenuClick = { screen = Screen.ADMIN },
+                onServerClick = { screen = Screen.SERVERS }
             )
         }
     }
