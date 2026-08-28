@@ -25,7 +25,7 @@ import com.ninjaconfig.app.ui.theme.*
 fun HomeScreen(
     uiState: ConfigsUiState,
     onConfigClick: (VpnConfig) -> Unit,
-    onAdminClick: () -> Unit
+    onBack: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -34,9 +34,7 @@ fun HomeScreen(
             .padding(horizontal = 16.dp)
     ) {
         Spacer(Modifier.height(16.dp))
-        HeaderBar(onAdminClick = onAdminClick)
-        Spacer(Modifier.height(16.dp))
-        FeaturePills()
+        BackBar(onBack = onBack)
         Spacer(Modifier.height(16.dp))
 
         when (uiState) {
@@ -67,48 +65,14 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HeaderBar(onAdminClick: () -> Unit) {
+private fun BackBar(onBack: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            "NINJA CONFIG",
-            color = AccentWhite,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.ExtraBold
-        )
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            // Long-press-free direct access; hide/replace with a hidden gesture if you want it more discreet.
-            IconButton(onClick = onAdminClick) {
-                Icon(Icons.Filled.Settings, contentDescription = "Admin", tint = AccentWhite)
-            }
-            Spacer(Modifier.width(4.dp))
-        }
-    }
-}
-
-@Composable
-private fun FeaturePills() {
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Pill(icon = Icons.Filled.Favorite, text = "Truly Free & Unlimited")
-        Pill(icon = Icons.Filled.Bolt, text = "10 Gbps High-Speed")
-    }
-}
-
-@Composable
-private fun Pill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(CardDark)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = AccentWhite, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(text, color = AccentWhite, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        IconButton(onClick = onBack) {
+            Icon(Icons.Filled.ArrowBack, contentDescription = "Back", tint = AccentWhite)
+        }
     }
 }
 
@@ -155,7 +119,17 @@ private fun ConfigRow(
                 .background(CardDarker),
             contentAlignment = Alignment.Center
         ) {
-            Text(countryCodeToFlagEmoji(flagCode), fontSize = 18.sp)
+            val code = flagCode.trim()
+            if (code.length == 2) {
+                coil.compose.AsyncImage(
+                    model = "https://flagcdn.com/w160/${code.lowercase()}.png",
+                    contentDescription = countryName,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                )
+            } else {
+                Text(countryCodeToFlagEmoji(flagCode), fontSize = 18.sp)
+            }
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
@@ -171,7 +145,7 @@ private fun ConfigRow(
             if (config.supportsGaming) {
                 Icon(Icons.Filled.SportsEsports, contentDescription = "Gaming", tint = TextSecondary, modifier = Modifier.size(18.dp))
             }
-            Icon(Icons.Filled.Wifi, contentDescription = "Wifi", tint = TextSecondary, modifier = Modifier.size(18.dp))
+            Icon(Icons.Filled.Wifi, contentDescription = "Wifi", tint = NeonGreen, modifier = Modifier.size(18.dp))
         }
     }
 }

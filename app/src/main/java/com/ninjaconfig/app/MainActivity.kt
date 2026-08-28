@@ -176,7 +176,7 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
                     userPickedConfig = true
                     screen = Screen.MAIN
                 },
-                onAdminClick = { screen = Screen.ADMIN }
+                onBack = { screen = Screen.MAIN }
             )
         }
         Screen.MAIN -> {
