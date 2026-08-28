@@ -23,7 +23,9 @@ class ConfigViewModel(
     private val repository: ConfigRepository = ConfigRepository()
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<ConfigsUiState>(ConfigsUiState.Loading)
+    private val _uiState = MutableStateFlow<ConfigsUiState>(
+        ConfigsUiState.Loaded(BundledConfigs.list.groupedByCountry())
+    )
     val uiState: StateFlow<ConfigsUiState> = _uiState
 
     // Firestore requires reaching Google's servers, which may be unreachable
@@ -43,13 +45,9 @@ class ConfigViewModel(
                 publish()
             }
             .catch { e ->
-                // Firestore failed entirely (e.g. blocked) - fall back to
-                // whatever GitHub gave us instead of showing an error.
-                if (githubConfigs.isNotEmpty()) {
-                    publish()
-                } else {
-                    _uiState.value = ConfigsUiState.Error(e.message ?: "خطای ناشناخته")
-                }
+                // Firestore failed entirely (e.g. blocked) - bundled configs are
+                // always shown regardless, so just fall back to them + GitHub.
+                publish()
             }
             .launchIn(viewModelScope)
     }
@@ -90,7 +88,7 @@ class ConfigViewModel(
     }
 
     private fun publish() {
-        val merged = (firestoreConfigs + githubConfigs).distinctBy { it.configLink }
+        val merged = (BundledConfigs.list + firestoreConfigs + githubConfigs).distinctBy { it.configLink }
         _uiState.value = ConfigsUiState.Loaded(merged.groupedByCountry())
     }
 
