@@ -6,5 +6,29 @@
     "configLink": "vless://50414e45-4c5f-5a45-5553-7ac458bcad4f@104.25.232.223:443?path=%2Fstream%2FPANEL_ZEUS%2F7ac458bcad4f&security=tls&encryption=none&insecure=0&host=ez-a0a529.abolfazlhedayati355.workers.dev&fp=ios&type=ws&allowInsecure=0&sni=ez-a0a529.abolfazlhedayati355.workers.dev&fragment=200-3000,1-2#ZEUS%20%7C%20%F0%9F%8C%90%20%7C%20ZEUS-O27CRPJ3",
     "label": "",
     "isPremium": false
+  },
+  {
+    "countryCode": "TR",
+    "countryName": "Türkiye",
+    "protocol": "vless",
+    "configLink": "vless://50414e45-4c5f-5a45-5553-7ac458bcad4f@172.67.172.95:443?path=%2Fstream%2FPANEL_ZEUS%2F7ac458bcad4f&security=tls&encryption=none&insecure=0&host=ez-a0a529.abolfazlhedayati355.workers.dev&fp=ios&type=ws&allowInsecure=0&sni=ez-a0a529.abolfazlhedayati355.workers.dev&fragment=200-3000,1-2#ZEUS%20%7C%20%F0%9F%8C%90%20%7C%20ZEUS-O27CRPJ3",
+    "label": "",
+    "isPremium": false
+  },
+  {
+    "countryCode": "US",
+    "countryName": "United States",
+    "protocol": "vless",
+    "configLink": "vless://50414e45-4c5f-5a45-5553-7ac458bcad4f@172.64.145.118:443?path=%2Fstream%2FPANEL_ZEUS%2F7ac458bcad4f&security=tls&encryption=none&insecure=0&host=ez-a0a529.abolfazlhedayati355.workers.dev&fp=ios&type=ws&allowInsecure=0&sni=ez-a0a529.abolfazlhedayati355.workers.dev&fragment=200-3000,1-2#ZEUS%20%7C%20%F0%9F%8C%90%20%7C%20ZEUS-O27CRPJ3",
+    "label": "",
+    "isPremium": false
+  },
+  {
+    "countryCode": "IR",
+    "countryName": "IRAN",
+    "protocol": "vless",
+    "configLink": "vless://50414e45-4c5f-5a45-5553-7ac458bcad4f@104.24.154.75:443?path=%2Fstream%2FPANEL_ZEUS%2F7ac458bcad4f&security=tls&encryption=none&insecure=0&host=ez-a0a529.abolfazlhedayati355.workers.dev&fp=ios&type=ws&allowInsecure=0&sni=ez-a0a529.abolfazlhedayati355.workers.dev&fragment=200-3000,1-2#ZEUS%20%7C%20%F0%9F%8C%90%20%7C%20ZEUS-O27CRPJ3",
+    "label": "",
+    "isPremium": false
   }
 ]
