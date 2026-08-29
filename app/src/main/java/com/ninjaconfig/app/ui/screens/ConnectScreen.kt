@@ -1,6 +1,8 @@
 package com.ninjaconfig.app.ui.screens
 
 import android.graphics.BlurMaskFilter
+import android.net.TrafficStats
+import android.os.Process
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -15,6 +17,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -49,15 +53,37 @@ fun ConnectScreen(
     onMenuClick: () -> Unit,
     onServerClick: () -> Unit
 ) {
-    var elapsedSeconds by remember { mutableStateOf(0) }
+    var downloadMbps by remember { mutableStateOf(0f) }
+    var uploadMbps by remember { mutableStateOf(0f) }
+    var downloadHistory by remember { mutableStateOf(listOf<Float>()) }
+    var uploadHistory by remember { mutableStateOf(listOf<Float>()) }
 
+    // Real traffic measured from this app's actual network usage (TrafficStats),
+    // sampled once a second - not simulated numbers.
     LaunchedEffect(connectionState) {
         if (connectionState == ConnectionState.CONNECTED) {
-            elapsedSeconds = 0
+            downloadMbps = 0f
+            uploadMbps = 0f
+            downloadHistory = emptyList()
+            uploadHistory = emptyList()
+            var (prevRx, prevTx) = currentRxTxBytes()
             while (true) {
                 delay(1000)
-                elapsedSeconds++
+                val (rx, tx) = currentRxTxBytes()
+                val down = ((rx - prevRx).coerceAtLeast(0) * 8f) / 1_000_000f
+                val up = ((tx - prevTx).coerceAtLeast(0) * 8f) / 1_000_000f
+                prevRx = rx
+                prevTx = tx
+                downloadMbps = down
+                uploadMbps = up
+                downloadHistory = (downloadHistory + down).takeLast(24)
+                uploadHistory = (uploadHistory + up).takeLast(24)
             }
+        } else {
+            downloadMbps = 0f
+            uploadMbps = 0f
+            downloadHistory = emptyList()
+            uploadHistory = emptyList()
         }
     }
 
@@ -85,14 +111,97 @@ fun ConnectScreen(
                     .aspectRatio(1f)
                     .padding(horizontal = 20.dp),
                 state = connectionState,
-                elapsedSeconds = elapsedSeconds,
                 onClick = onToggleConnect
             )
             Spacer(Modifier.height(30.dp))
             SecureBanner(state = connectionState)
             Spacer(Modifier.height(14.dp))
             ServerInfoRow(config = selectedConfig, onClick = onServerClick)
+            if (connectionState == ConnectionState.CONNECTED) {
+                Spacer(Modifier.height(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SpeedCard(
+                        modifier = Modifier.weight(1f),
+                        title = "DOWNLOAD",
+                        speedMbps = downloadMbps,
+                        history = downloadHistory,
+                        icon = Icons.Filled.ArrowDownward
+                    )
+                    SpeedCard(
+                        modifier = Modifier.weight(1f),
+                        title = "UPLOAD",
+                        speedMbps = uploadMbps,
+                        history = uploadHistory,
+                        icon = Icons.Filled.ArrowUpward
+                    )
+                }
+            }
             Spacer(Modifier.height(20.dp))
+        }
+    }
+}
+
+private fun currentRxTxBytes(): Pair<Long, Long> {
+    val uid = Process.myUid()
+    val rx = TrafficStats.getUidRxBytes(uid).let { if (it < 0) TrafficStats.getTotalRxBytes() else it }
+    val tx = TrafficStats.getUidTxBytes(uid).let { if (it < 0) TrafficStats.getTotalTxBytes() else it }
+    return rx to tx
+}
+
+@Composable
+private fun SpeedCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    speedMbps: Float,
+    history: List<Float>,
+    icon: androidx.compose.ui.graphics.vector.ImageVector
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(CardDark)
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(title, color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(NeonGreen.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(14.dp))
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                "%.1f".format(speedMbps),
+                color = AccentWhite,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.width(4.dp))
+            Text("Mbps", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.padding(bottom = 3.dp))
+        }
+        Spacer(Modifier.height(8.dp))
+        Canvas(modifier = Modifier.fillMaxWidth().height(24.dp)) {
+            if (history.size >= 2) {
+                val maxVal = (history.maxOrNull() ?: 1f).coerceAtLeast(1f)
+                val stepX = size.width / (history.size - 1).coerceAtLeast(1)
+                val path = Path()
+                history.forEachIndexed { index, value ->
+                    val x = index * stepX
+                    val y = size.height - (value / maxVal) * size.height
+                    if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                drawPath(path, color = NeonGreen, style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round))
+            }
         }
     }
 }
@@ -127,7 +236,6 @@ private fun TopBar(onMenuClick: () -> Unit) {
 private fun AnimatedRingWithShield(
     modifier: Modifier = Modifier,
     state: ConnectionState,
-    elapsedSeconds: Int,
     onClick: () -> Unit
 ) {
     val isConnected = state == ConnectionState.CONNECTED
@@ -236,14 +344,6 @@ private fun AnimatedRingWithShield(
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 2.sp
             )
-            if (isConnected) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = formatElapsed(elapsedSeconds),
-                    color = Color.White.copy(alpha = 0.65f),
-                    fontSize = 14.sp
-                )
-            }
         }
     }
 }
@@ -285,13 +385,6 @@ private fun ShieldIcon(modifier: Modifier = Modifier, color: Color, showCheck: B
             )
         }
     }
-}
-
-private fun formatElapsed(totalSeconds: Int): String {
-    val h = totalSeconds / 3600
-    val m = (totalSeconds % 3600) / 60
-    val s = totalSeconds % 60
-    return "%02d:%02d:%02d".format(h, m, s)
 }
 
 @Composable
