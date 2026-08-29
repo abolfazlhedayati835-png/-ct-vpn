@@ -78,6 +78,50 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
     var userPickedConfig by remember { mutableStateOf(false) }
     var connectionState by remember { mutableStateOf(ConnectionState.DISCONNECTED) }
 
+    // Traffic totals live here (not inside ConnectScreen) so they survive
+    // navigating to the server list and back - only a real disconnect resets them.
+    var downloadRateMbps by remember { mutableStateOf(0f) }
+    var uploadRateMbps by remember { mutableStateOf(0f) }
+    var downloadHistory by remember { mutableStateOf(listOf<Float>()) }
+    var uploadHistory by remember { mutableStateOf(listOf<Float>()) }
+    var totalDownloadBytes by remember { mutableStateOf(0L) }
+    var totalUploadBytes by remember { mutableStateOf(0L) }
+
+    LaunchedEffect(connectionState) {
+        if (connectionState == ConnectionState.CONNECTED) {
+            downloadRateMbps = 0f
+            uploadRateMbps = 0f
+            downloadHistory = emptyList()
+            uploadHistory = emptyList()
+            totalDownloadBytes = 0L
+            totalUploadBytes = 0L
+            val (baseRx, baseTx) = com.ninjaconfig.app.ui.screens.currentRxTxBytes()
+            var prevRx = baseRx
+            var prevTx = baseTx
+            while (true) {
+                kotlinx.coroutines.delay(1000)
+                val (rx, tx) = com.ninjaconfig.app.ui.screens.currentRxTxBytes()
+                val downDelta = (rx - prevRx).coerceAtLeast(0)
+                val upDelta = (tx - prevTx).coerceAtLeast(0)
+                prevRx = rx
+                prevTx = tx
+                downloadRateMbps = (downDelta * 8f) / 1_000_000f
+                uploadRateMbps = (upDelta * 8f) / 1_000_000f
+                downloadHistory = (downloadHistory + downloadRateMbps).takeLast(24)
+                uploadHistory = (uploadHistory + uploadRateMbps).takeLast(24)
+                totalDownloadBytes = (rx - baseRx).coerceAtLeast(0)
+                totalUploadBytes = (tx - baseTx).coerceAtLeast(0)
+            }
+        } else {
+            downloadRateMbps = 0f
+            uploadRateMbps = 0f
+            downloadHistory = emptyList()
+            uploadHistory = emptyList()
+            totalDownloadBytes = 0L
+            totalUploadBytes = 0L
+        }
+    }
+
     // Auto-pick a config once the list loads, but only until the user manually
     // chooses one from the server list - after that we respect their choice.
     LaunchedEffect(uiState) {
@@ -183,6 +227,10 @@ private fun AppRoot(requestVpnPermission: (( (Boolean) -> Unit ) -> Unit)) {
             ConnectScreen(
                 selectedConfig = selectedConfig,
                 connectionState = connectionState,
+                downloadHistory = downloadHistory,
+                uploadHistory = uploadHistory,
+                totalDownloadBytes = totalDownloadBytes,
+                totalUploadBytes = totalUploadBytes,
                 onToggleConnect = {
                     when (connectionState) {
                         ConnectionState.DISCONNECTED -> {

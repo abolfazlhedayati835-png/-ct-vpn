@@ -49,55 +49,14 @@ enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED }
 fun ConnectScreen(
     selectedConfig: VpnConfig?,
     connectionState: ConnectionState,
+    downloadHistory: List<Float>,
+    uploadHistory: List<Float>,
+    totalDownloadBytes: Long,
+    totalUploadBytes: Long,
     onToggleConnect: () -> Unit,
     onMenuClick: () -> Unit,
     onServerClick: () -> Unit
 ) {
-    var downloadRateMbps by remember { mutableStateOf(0f) }
-    var uploadRateMbps by remember { mutableStateOf(0f) }
-    var downloadHistory by remember { mutableStateOf(listOf<Float>()) }
-    var uploadHistory by remember { mutableStateOf(listOf<Float>()) }
-    var totalDownloadBytes by remember { mutableStateOf(0L) }
-    var totalUploadBytes by remember { mutableStateOf(0L) }
-
-    // Real traffic measured from this app's actual network usage (TrafficStats).
-    // The big number is the running total since connecting (only ever goes up,
-    // like Downlink/Uplink in other VPN apps) - the small graph still reflects
-    // the current rate so it's not just a static climbing number.
-    LaunchedEffect(connectionState) {
-        if (connectionState == ConnectionState.CONNECTED) {
-            downloadRateMbps = 0f
-            uploadRateMbps = 0f
-            downloadHistory = emptyList()
-            uploadHistory = emptyList()
-            totalDownloadBytes = 0L
-            totalUploadBytes = 0L
-            val (baseRx, baseTx) = currentRxTxBytes()
-            var prevRx = baseRx
-            var prevTx = baseTx
-            while (true) {
-                delay(1000)
-                val (rx, tx) = currentRxTxBytes()
-                val downDelta = (rx - prevRx).coerceAtLeast(0)
-                val upDelta = (tx - prevTx).coerceAtLeast(0)
-                prevRx = rx
-                prevTx = tx
-                downloadRateMbps = (downDelta * 8f) / 1_000_000f
-                uploadRateMbps = (upDelta * 8f) / 1_000_000f
-                downloadHistory = (downloadHistory + downloadRateMbps).takeLast(24)
-                uploadHistory = (uploadHistory + uploadRateMbps).takeLast(24)
-                totalDownloadBytes = (rx - baseRx).coerceAtLeast(0)
-                totalUploadBytes = (tx - baseTx).coerceAtLeast(0)
-            }
-        } else {
-            downloadRateMbps = 0f
-            uploadRateMbps = 0f
-            downloadHistory = emptyList()
-            uploadHistory = emptyList()
-            totalDownloadBytes = 0L
-            totalUploadBytes = 0L
-        }
-    }
 
     Box(
         modifier = Modifier
@@ -151,7 +110,7 @@ fun ConnectScreen(
     }
 }
 
-private fun currentRxTxBytes(): Pair<Long, Long> {
+fun currentRxTxBytes(): Pair<Long, Long> {
     val uid = Process.myUid()
     val rx = TrafficStats.getUidRxBytes(uid).let { if (it < 0) TrafficStats.getTotalRxBytes() else it }
     val tx = TrafficStats.getUidTxBytes(uid).let { if (it < 0) TrafficStats.getTotalTxBytes() else it }
