@@ -53,37 +53,49 @@ fun ConnectScreen(
     onMenuClick: () -> Unit,
     onServerClick: () -> Unit
 ) {
-    var downloadMbps by remember { mutableStateOf(0f) }
-    var uploadMbps by remember { mutableStateOf(0f) }
+    var downloadRateMbps by remember { mutableStateOf(0f) }
+    var uploadRateMbps by remember { mutableStateOf(0f) }
     var downloadHistory by remember { mutableStateOf(listOf<Float>()) }
     var uploadHistory by remember { mutableStateOf(listOf<Float>()) }
+    var totalDownloadBytes by remember { mutableStateOf(0L) }
+    var totalUploadBytes by remember { mutableStateOf(0L) }
 
-    // Real traffic measured from this app's actual network usage (TrafficStats),
-    // sampled once a second - not simulated numbers.
+    // Real traffic measured from this app's actual network usage (TrafficStats).
+    // The big number is the running total since connecting (only ever goes up,
+    // like Downlink/Uplink in other VPN apps) - the small graph still reflects
+    // the current rate so it's not just a static climbing number.
     LaunchedEffect(connectionState) {
         if (connectionState == ConnectionState.CONNECTED) {
-            downloadMbps = 0f
-            uploadMbps = 0f
+            downloadRateMbps = 0f
+            uploadRateMbps = 0f
             downloadHistory = emptyList()
             uploadHistory = emptyList()
-            var (prevRx, prevTx) = currentRxTxBytes()
+            totalDownloadBytes = 0L
+            totalUploadBytes = 0L
+            val (baseRx, baseTx) = currentRxTxBytes()
+            var prevRx = baseRx
+            var prevTx = baseTx
             while (true) {
                 delay(1000)
                 val (rx, tx) = currentRxTxBytes()
-                val down = ((rx - prevRx).coerceAtLeast(0) * 8f) / 1_000_000f
-                val up = ((tx - prevTx).coerceAtLeast(0) * 8f) / 1_000_000f
+                val downDelta = (rx - prevRx).coerceAtLeast(0)
+                val upDelta = (tx - prevTx).coerceAtLeast(0)
                 prevRx = rx
                 prevTx = tx
-                downloadMbps = down
-                uploadMbps = up
-                downloadHistory = (downloadHistory + down).takeLast(24)
-                uploadHistory = (uploadHistory + up).takeLast(24)
+                downloadRateMbps = (downDelta * 8f) / 1_000_000f
+                uploadRateMbps = (upDelta * 8f) / 1_000_000f
+                downloadHistory = (downloadHistory + downloadRateMbps).takeLast(24)
+                uploadHistory = (uploadHistory + uploadRateMbps).takeLast(24)
+                totalDownloadBytes = (rx - baseRx).coerceAtLeast(0)
+                totalUploadBytes = (tx - baseTx).coerceAtLeast(0)
             }
         } else {
-            downloadMbps = 0f
-            uploadMbps = 0f
+            downloadRateMbps = 0f
+            uploadRateMbps = 0f
             downloadHistory = emptyList()
             uploadHistory = emptyList()
+            totalDownloadBytes = 0L
+            totalUploadBytes = 0L
         }
     }
 
@@ -117,24 +129,22 @@ fun ConnectScreen(
             SecureBanner(state = connectionState)
             Spacer(Modifier.height(14.dp))
             ServerInfoRow(config = selectedConfig, onClick = onServerClick)
-            if (connectionState == ConnectionState.CONNECTED) {
-                Spacer(Modifier.height(14.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SpeedCard(
-                        modifier = Modifier.weight(1f),
-                        title = "DOWNLOAD",
-                        speedMbps = downloadMbps,
-                        history = downloadHistory,
-                        icon = Icons.Filled.ArrowDownward
-                    )
-                    SpeedCard(
-                        modifier = Modifier.weight(1f),
-                        title = "UPLOAD",
-                        speedMbps = uploadMbps,
-                        history = uploadHistory,
-                        icon = Icons.Filled.ArrowUpward
-                    )
-                }
+            Spacer(Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SpeedCard(
+                    modifier = Modifier.weight(1f),
+                    title = "DOWNLOAD",
+                    totalBytes = totalDownloadBytes,
+                    history = downloadHistory,
+                    icon = Icons.Filled.ArrowDownward
+                )
+                SpeedCard(
+                    modifier = Modifier.weight(1f),
+                    title = "UPLOAD",
+                    totalBytes = totalUploadBytes,
+                    history = uploadHistory,
+                    icon = Icons.Filled.ArrowUpward
+                )
             }
             Spacer(Modifier.height(20.dp))
         }
@@ -148,11 +158,21 @@ private fun currentRxTxBytes(): Pair<Long, Long> {
     return rx to tx
 }
 
+/** Splits a byte count into a display number + unit, climbing KB -> MB -> GB like other VPN apps. */
+private fun formatBytesSplit(bytes: Long): Pair<String, String> {
+    val kb = bytes / 1024.0
+    return when {
+        kb < 1024.0 -> "%.1f".format(kb) to "KB"
+        kb < 1024.0 * 1024.0 -> "%.1f".format(kb / 1024.0) to "MB"
+        else -> "%.2f".format(kb / 1024.0 / 1024.0) to "GB"
+    }
+}
+
 @Composable
 private fun SpeedCard(
     modifier: Modifier = Modifier,
     title: String,
-    speedMbps: Float,
+    totalBytes: Long,
     history: List<Float>,
     icon: androidx.compose.ui.graphics.vector.ImageVector
 ) {
@@ -179,15 +199,16 @@ private fun SpeedCard(
             }
         }
         Spacer(Modifier.height(6.dp))
+        val (numberText, unitText) = formatBytesSplit(totalBytes)
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
-                "%.1f".format(speedMbps),
+                numberText,
                 color = AccentWhite,
-                fontSize = 24.sp,
+                fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(Modifier.width(4.dp))
-            Text("Mbps", color = TextSecondary, fontSize = 12.sp, modifier = Modifier.padding(bottom = 3.dp))
+            Text(unitText, color = TextSecondary, fontSize = 12.sp, modifier = Modifier.padding(bottom = 3.dp))
         }
         Spacer(Modifier.height(8.dp))
         Canvas(modifier = Modifier.fillMaxWidth().height(24.dp)) {
