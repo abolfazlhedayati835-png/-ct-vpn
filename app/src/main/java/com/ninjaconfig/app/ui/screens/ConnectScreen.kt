@@ -169,7 +169,9 @@ private fun AnimatedRingWithShield(
                         asFrameworkPaint().maskFilter = BlurMaskFilter(22f, BlurMaskFilter.Blur.NORMAL)
                     }
                     canvas.save()
-                    canvas.rotate(rotation, cx, cy)
+                    canvas.translate(cx, cy)
+                    canvas.rotate(rotation)
+                    canvas.translate(-cx, -cy)
                     canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -90f, 275f, false, glowPaint)
                     canvas.restore()
                 }
@@ -183,7 +185,9 @@ private fun AnimatedRingWithShield(
                         asFrameworkPaint().maskFilter = BlurMaskFilter(6f, BlurMaskFilter.Blur.NORMAL)
                     }
                     canvas.save()
-                    canvas.rotate(rotation, cx, cy)
+                    canvas.translate(cx, cy)
+                    canvas.rotate(rotation)
+                    canvas.translate(-cx, -cy)
                     canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -90f, 275f, false, mainPaint)
                     canvas.restore()
                 }
