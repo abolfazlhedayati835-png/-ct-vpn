@@ -1,6 +1,12 @@
 package com.ninjaconfig.app.ui.screens
 
-import androidx.compose.animation.core.*
+import android.graphics.BlurMaskFilter
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,29 +15,29 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.PaintingStyle
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ninjaconfig.app.data.VpnConfig
-import com.ninjaconfig.app.data.countryCodeToFlagEmoji
 import com.ninjaconfig.app.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.random.Random
 
 enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED }
 
@@ -55,21 +61,39 @@ fun ConnectScreen(
         }
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(BgBlack)
-            .padding(horizontal = 20.dp)
     ) {
-        Spacer(Modifier.height(20.dp))
-        TopBar(onMenuClick = onMenuClick)
-        Spacer(Modifier.height(30.dp))
-        ConnectRing(state = connectionState, elapsedSeconds = elapsedSeconds, onClick = onToggleConnect)
-        Spacer(Modifier.height(30.dp))
-        SecureBanner(state = connectionState)
-        Spacer(Modifier.height(14.dp))
-        ServerInfoRow(config = selectedConfig, onClick = onServerClick)
-        Spacer(Modifier.height(20.dp))
+        DotMatrixBackground(
+            modifier = Modifier.fillMaxSize(),
+            dotColor = NeonGreenDim
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp)
+        ) {
+            Spacer(Modifier.height(20.dp))
+            TopBar(onMenuClick = onMenuClick)
+            Spacer(Modifier.height(30.dp))
+            AnimatedRingWithShield(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .padding(horizontal = 20.dp),
+                state = connectionState,
+                elapsedSeconds = elapsedSeconds,
+                onClick = onToggleConnect
+            )
+            Spacer(Modifier.height(30.dp))
+            SecureBanner(state = connectionState)
+            Spacer(Modifier.height(14.dp))
+            ServerInfoRow(config = selectedConfig, onClick = onServerClick)
+            Spacer(Modifier.height(20.dp))
+        }
     }
 }
 
@@ -100,159 +124,161 @@ private fun TopBar(onMenuClick: () -> Unit) {
 }
 
 @Composable
-private fun ConnectRing(state: ConnectionState, elapsedSeconds: Int, onClick: () -> Unit) {
+private fun AnimatedRingWithShield(
+    modifier: Modifier = Modifier,
+    state: ConnectionState,
+    elapsedSeconds: Int,
+    onClick: () -> Unit
+) {
     val isConnected = state == ConnectionState.CONNECTED
-    val ringColor = NeonGreen
+    val neonGreen = NeonGreen
+    val dimGray = Color(0xFF4A5568)
 
-    val infinite = rememberInfiniteTransition(label = "ring")
-    val rotation by infinite.animateFloat(
+    val infiniteTransition = rememberInfiniteTransition(label = "rotation")
+    val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(3200, easing = LinearEasing),
+            animation = tween(3500, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "rotation"
     )
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
-            .padding(horizontal = 20.dp),
+        modifier = modifier.clickable(
+            indication = null,
+            interactionSource = remember { MutableInteractionSource() },
+            onClick = onClick
+        ),
         contentAlignment = Alignment.Center
     ) {
-        // Faint scattered world-map-style dot backdrop behind the ring
-        DotFieldBackground(modifier = Modifier.fillMaxSize())
-
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val strokeWidth = 14.dp.toPx()
-            val radius = (size.minDimension - strokeWidth) / 2f - 10.dp.toPx()
-            val center = Offset(size.width / 2f, size.height / 2f)
-            val topLeft = Offset(center.x - radius, center.y - radius)
-            val arcSize = Size(radius * 2, radius * 2)
-
-            // Dim full background track
-            drawArc(
-                color = OutlinePill.copy(alpha = 0.4f),
-                startAngle = 0f,
-                sweepAngle = 360f,
-                useCenter = false,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                topLeft = topLeft,
-                size = arcSize
-            )
+            val cx = size.width / 2
+            val cy = size.height / 2
+            val r = size.minDimension / 2 - 18.dp.toPx()
+            val sw = 6.5f.dp.toPx()
 
             if (isConnected) {
-                val sweep = 300f
-                val startAngle = rotation - 90f
-
-                // Soft outer glow: several widening, fading passes behind the main arc
-                listOf(3.2f to 0.06f, 2.4f to 0.10f, 1.7f to 0.16f).forEach { (widthMul, alpha) ->
-                    drawArc(
-                        color = ringColor.copy(alpha = alpha),
-                        startAngle = startAngle,
-                        sweepAngle = sweep,
-                        useCenter = false,
-                        style = Stroke(width = strokeWidth * widthMul, cap = StrokeCap.Round),
-                        topLeft = topLeft,
-                        size = arcSize
-                    )
+                drawIntoCanvas { canvas ->
+                    val glowPaint = Paint().apply {
+                        color = neonGreen.copy(alpha = 0.35f)
+                        style = PaintingStyle.Stroke
+                        strokeWidth = sw * 2.2f
+                        strokeCap = StrokeCap.Round
+                        asFrameworkPaint().maskFilter = BlurMaskFilter(22f, BlurMaskFilter.Blur.NORMAL)
+                    }
+                    canvas.save()
+                    canvas.rotate(rotation, cx, cy)
+                    canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -90f, 275f, false, glowPaint)
+                    canvas.restore()
                 }
 
-                // Sharp bright arc on top, fading tail like the reference design
+                drawIntoCanvas { canvas ->
+                    val mainPaint = Paint().apply {
+                        color = neonGreen
+                        style = PaintingStyle.Stroke
+                        strokeWidth = sw
+                        strokeCap = StrokeCap.Round
+                        asFrameworkPaint().maskFilter = BlurMaskFilter(6f, BlurMaskFilter.Blur.NORMAL)
+                    }
+                    canvas.save()
+                    canvas.rotate(rotation, cx, cy)
+                    canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -90f, 275f, false, mainPaint)
+                    canvas.restore()
+                }
+
+                drawIntoCanvas { canvas ->
+                    val tipAngle = Math.toRadians((rotation - 90).toDouble())
+                    val tipX = cx + r * cos(tipAngle).toFloat()
+                    val tipY = cy + r * sin(tipAngle).toFloat()
+                    val tipPaint = Paint().apply {
+                        color = Color.White.copy(alpha = 0.9f)
+                        asFrameworkPaint().maskFilter = BlurMaskFilter(12f, BlurMaskFilter.Blur.NORMAL)
+                    }
+                    canvas.drawCircle(Offset(tipX, tipY), 5.5f.dp.toPx(), tipPaint)
+                }
+            } else {
                 drawArc(
-                    brush = Brush.sweepGradient(
-                        listOf(ringColor.copy(alpha = 0.1f), ringColor, ringColor)
-                    ),
-                    startAngle = startAngle,
-                    sweepAngle = sweep,
+                    color = dimGray.copy(alpha = 0.5f),
+                    startAngle = -90f,
+                    sweepAngle = 360f,
                     useCenter = false,
-                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
-                    topLeft = topLeft,
-                    size = arcSize
+                    style = Stroke(width = sw, cap = StrokeCap.Round),
+                    topLeft = Offset(cx - r, cy - r),
+                    size = androidx.compose.ui.geometry.Size(r * 2, r * 2)
                 )
-
-                // Glowing dots at both ends of the spinning arc
-                listOf(startAngle, startAngle + sweep).forEach { angleDeg ->
-                    val rad = Math.toRadians(angleDeg.toDouble())
-                    val dotX = center.x + radius * cos(rad).toFloat()
-                    val dotY = center.y + radius * sin(rad).toFloat()
-                    val dotCenter = Offset(dotX, dotY)
-                    drawCircle(color = ringColor.copy(alpha = 0.25f), radius = strokeWidth * 1.8f, center = dotCenter)
-                    drawCircle(color = ringColor, radius = strokeWidth * 0.85f, center = dotCenter)
-                }
             }
         }
 
+        ShieldIcon(
+            modifier = Modifier.size(88.dp),
+            color = if (isConnected) neonGreen else dimGray,
+            showCheck = isConnected
+        )
+
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .clip(CircleShape)
-                .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onClick)
-                .padding(40.dp)
+            modifier = Modifier.offset(y = 72.dp)
         ) {
-            Box(
-                modifier = Modifier.size(72.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Shield,
-                    contentDescription = null,
-                    tint = if (isConnected) AccentWhite.copy(alpha = 0.85f) else TextSecondary,
-                    modifier = Modifier.size(72.dp)
-                )
-                if (isConnected) {
-                    Icon(
-                        imageVector = Icons.Filled.Check,
-                        contentDescription = null,
-                        tint = NeonGreen,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.height(14.dp))
             Text(
-                when (state) {
+                text = when (state) {
                     ConnectionState.CONNECTED -> "CONNECTED"
                     ConnectionState.CONNECTING -> "CONNECTING..."
                     ConnectionState.DISCONNECTED -> "DISCONNECTED"
                 },
-                color = if (isConnected) NeonGreen else TextSecondary,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                letterSpacing = 1.5.sp
+                color = if (isConnected) neonGreen else TextSecondary,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 2.sp
             )
             if (isConnected) {
-                Spacer(Modifier.height(4.dp))
-                Text(formatElapsed(elapsedSeconds), color = AccentWhite, fontSize = 14.sp)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = formatElapsed(elapsedSeconds),
+                    color = Color.White.copy(alpha = 0.65f),
+                    fontSize = 14.sp
+                )
             }
         }
     }
 }
 
-/** A quiet scatter of dots behind the ring, echoing a world-map texture without needing map data. */
 @Composable
-private fun DotFieldBackground(modifier: Modifier = Modifier) {
-    val dots = remember {
-        val rnd = Random(42)
-        List(140) {
-            Triple(rnd.nextFloat(), rnd.nextFloat(), 0.6f + rnd.nextFloat() * 0.8f)
-        }
-    }
+private fun ShieldIcon(modifier: Modifier = Modifier, color: Color, showCheck: Boolean) {
     Canvas(modifier = modifier) {
-        val minDim = size.minDimension
-        dots.forEach { (fx, fy, sizeMul) ->
-            val x = fx * size.width
-            val y = fy * size.height
-            val distFromCenter = kotlin.math.hypot(x - size.width / 2f, y - size.height / 2f)
-            if (distFromCenter < minDim / 2f * 1.05f) {
-                drawCircle(
-                    color = TextSecondary.copy(alpha = 0.12f),
-                    radius = 1.4.dp.toPx() * sizeMul,
-                    center = Offset(x, y)
-                )
+        val w = size.width
+        val h = size.height
+        val p = w * 0.06f
+        val stroke = 3.2f.dp.toPx()
+
+        val shieldPath = Path().apply {
+            moveTo(w / 2, p)
+            lineTo(w - p, h * 0.18f)
+            lineTo(w - p, h * 0.52f)
+            cubicTo(w - p, h * 0.78f, w * 0.72f, h * 0.92f, w / 2, h - p)
+            cubicTo(w * 0.28f, h * 0.92f, p, h * 0.78f, p, h * 0.52f)
+            lineTo(p, h * 0.18f)
+            close()
+        }
+
+        drawPath(
+            path = shieldPath,
+            color = color,
+            style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+
+        if (showCheck) {
+            val checkPath = Path().apply {
+                moveTo(w * 0.32f, h * 0.48f)
+                lineTo(w * 0.45f, h * 0.62f)
+                lineTo(w * 0.68f, h * 0.38f)
             }
+            drawPath(
+                path = checkPath,
+                color = color,
+                style = Stroke(width = stroke * 1.3f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+            )
         }
     }
 }
@@ -265,46 +291,59 @@ private fun formatElapsed(totalSeconds: Int): String {
 }
 
 @Composable
+private fun MiniShieldIcon(modifier: Modifier = Modifier, color: Color) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val p = w * 0.08f
+        val stroke = 2.2f.dp.toPx()
+
+        val path = Path().apply {
+            moveTo(w / 2, p)
+            lineTo(w - p, h * 0.2f)
+            lineTo(w - p, h * 0.5f)
+            cubicTo(w - p, h * 0.75f, w * 0.7f, h * 0.9f, w / 2, h - p)
+            cubicTo(w * 0.3f, h * 0.9f, p, h * 0.75f, p, h * 0.5f)
+            lineTo(p, h * 0.2f)
+            close()
+        }
+
+        drawPath(
+            path = path,
+            color = color,
+            style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        )
+    }
+}
+
+@Composable
 private fun SecureBanner(state: ConnectionState) {
     val connected = state == ConnectionState.CONNECTED
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(CardDark)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(if (connected) NeonGreenDim.copy(alpha = 0.35f) else CardDarker),
+                .size(38.dp)
+                .background(NeonGreen.copy(alpha = 0.12f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                Icons.Outlined.Shield,
-                contentDescription = null,
-                tint = if (connected) NeonGreen else TextSecondary,
-                modifier = Modifier.size(18.dp)
-            )
+            MiniShieldIcon(modifier = Modifier.size(22.dp), color = if (connected) NeonGreen else TextSecondary)
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(14.dp))
         Text(
             if (connected) "اتصال شما امن است" else "برای اتصال امن، وصل شوید",
             color = AccentWhite,
-            fontSize = 14.sp,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
             modifier = Modifier.weight(1f)
         )
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(NeonGreenDim.copy(alpha = 0.25f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(16.dp))
-        }
+        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(26.dp))
     }
 }
 
@@ -313,14 +352,14 @@ private fun ServerInfoRow(config: VpnConfig?, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(CardDark)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 18.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.size(38.dp).clip(CircleShape).background(CardDarker),
+            modifier = Modifier.size(40.dp).clip(CircleShape).background(CardDarker),
             contentAlignment = Alignment.Center
         ) {
             val code = config?.countryCode?.trim()
@@ -336,13 +375,45 @@ private fun ServerInfoRow(config: VpnConfig?, onClick: () -> Unit) {
             }
         }
         Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(config?.countryName ?: "در حال انتخاب سرور", color = AccentWhite, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-            if (config?.label?.isNotBlank() == true) {
-                Text(config.label, color = TextSecondary, fontSize = 12.sp)
-            }
-        }
-        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = TextSecondary)
+        Text(
+            config?.countryName ?: "در حال انتخاب سرور",
+            color = AccentWhite,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = AccentWhite.copy(alpha = 0.45f), modifier = Modifier.size(26.dp))
     }
 }
 
+@Composable
+private fun DotMatrixBackground(modifier: Modifier = Modifier, dotColor: Color) {
+    Canvas(modifier = modifier) {
+        val spacing = 13.dp.toPx()
+        val dotRadius = 1.1f
+
+        val rows = (size.height / spacing).toInt() + 2
+        val cols = (size.width / spacing).toInt() + 2
+
+        for (row in 0 until rows) {
+            for (col in 0 until cols) {
+                val x = col * spacing
+                val y = row * spacing
+
+                val v1 = kotlin.math.sin(x * 0.0075f) * kotlin.math.cos(y * 0.0085f)
+                val v2 = kotlin.math.sin(x * 0.014f + 1.5f) * kotlin.math.cos(y * 0.011f + 2.5f)
+                val v3 = kotlin.math.sin((x + y) * 0.005f)
+                val value = (v1 + v2 * 0.6f + v3 * 0.4f) / 2f
+
+                if (value > 0.12f) {
+                    val alpha = (0.15f + value * 0.4f).coerceIn(0.15f, 0.55f)
+                    drawCircle(
+                        color = dotColor.copy(alpha = alpha),
+                        radius = dotRadius,
+                        center = Offset(x, y)
+                    )
+                }
+            }
+        }
+    }
+}
