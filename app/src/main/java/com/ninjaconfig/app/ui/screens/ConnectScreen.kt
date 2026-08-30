@@ -1,7 +1,9 @@
 package com.ninjaconfig.app.ui.screens
 
+import android.content.Intent
 import android.graphics.BlurMaskFilter
 import android.net.TrafficStats
+import android.net.Uri
 import android.os.Process
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -20,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,9 +37,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.ninjaconfig.app.data.VpnConfig
 import com.ninjaconfig.app.ui.theme.*
 import kotlinx.coroutines.delay
@@ -44,6 +50,8 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED }
+
+private const val TELEGRAM_CHANNEL_URL = "https://t.me/CTVPN_Free"
 
 @Composable
 fun ConnectScreen(
@@ -57,6 +65,30 @@ fun ConnectScreen(
     onMenuClick: () -> Unit,
     onServerClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    var showTelegramPrompt by remember { mutableStateOf(false) }
+
+    // Show the Telegram-channel prompt a moment after each successful connect,
+    // like an ad placement - not on app open, not while just browsing servers.
+    LaunchedEffect(connectionState) {
+        if (connectionState == ConnectionState.CONNECTED) {
+            delay(1500)
+            showTelegramPrompt = true
+        } else {
+            showTelegramPrompt = false
+        }
+    }
+
+    if (showTelegramPrompt) {
+        TelegramPromptDialog(
+            onJoin = {
+                showTelegramPrompt = false
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(TELEGRAM_CHANNEL_URL))
+                context.startActivity(intent)
+            },
+            onDismiss = { showTelegramPrompt = false }
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -106,6 +138,76 @@ fun ConnectScreen(
                 )
             }
             Spacer(Modifier.height(20.dp))
+        }
+    }
+}
+
+@Composable
+private fun TelegramPromptDialog(onJoin: () -> Unit, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .clip(RoundedCornerShape(22.dp))
+                .background(CardDark)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(NeonGreen.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Send, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(26.dp))
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "عضو کانال تلگرام CT VPN شوید",
+                color = AccentWhite,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "تو کانال ما آموزش تنظیمات، خبر سرورهای جدید و پشتیبانی مستقیم داریم.",
+                color = TextSecondary,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "فعلاً نه",
+                    color = TextSecondary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(CardDarker)
+                        .clickable(onClick = onDismiss)
+                        .padding(vertical = 14.dp)
+                )
+                Text(
+                    "بله، عضو می‌شوم",
+                    color = Color.Black,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(NeonGreen)
+                        .clickable(onClick = onJoin)
+                        .padding(vertical = 14.dp)
+                )
+            }
         }
     }
 }
