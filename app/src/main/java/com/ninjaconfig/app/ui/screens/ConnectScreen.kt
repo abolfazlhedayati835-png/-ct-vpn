@@ -72,7 +72,6 @@ fun ConnectScreen(
     // like an ad placement - not on app open, not while just browsing servers.
     LaunchedEffect(connectionState) {
         if (connectionState == ConnectionState.CONNECTED) {
-            delay(1500)
             showTelegramPrompt = true
         } else {
             showTelegramPrompt = false
@@ -163,7 +162,7 @@ private fun TelegramPromptDialog(onJoin: () -> Unit, onDismiss: () -> Unit) {
             }
             Spacer(Modifier.height(16.dp))
             Text(
-                "عضو کانال تلگرام CT VPN شوید",
+                "Join Us On Telegram?",
                 color = AccentWhite,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
@@ -171,7 +170,7 @@ private fun TelegramPromptDialog(onJoin: () -> Unit, onDismiss: () -> Unit) {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "تو کانال ما آموزش تنظیمات، خبر سرورهای جدید و پشتیبانی مستقیم داریم.",
+                "We have a telegram support channel where we post and discuss about settings, new features and also assist our users.\n\nWould you like to join us there?",
                 color = TextSecondary,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center
@@ -182,7 +181,7 @@ private fun TelegramPromptDialog(onJoin: () -> Unit, onDismiss: () -> Unit) {
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    "فعلاً نه",
+                    "LATER",
                     color = TextSecondary,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
@@ -195,7 +194,7 @@ private fun TelegramPromptDialog(onJoin: () -> Unit, onDismiss: () -> Unit) {
                         .padding(vertical = 14.dp)
                 )
                 Text(
-                    "بله، عضو می‌شوم",
+                    "YES",
                     color = Color.Black,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
